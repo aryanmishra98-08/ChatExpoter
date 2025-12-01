@@ -17,7 +17,7 @@ Since this is a Sunday vibe project, it's not on the Chrome Web Store (yet?). He
 
 1. **Clone or download this repository**
    ```bash
-   git clone <your-repo-url>
+   git clone <repo-url>
    ```
 
 2. **Open your browser's extension page**
