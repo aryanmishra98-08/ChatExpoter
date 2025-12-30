@@ -1,116 +1,191 @@
-# Chat Exporter for ChatGPT & Claude
+# Claude Track & Export
 
-> A vibe coding project built on a lazy Sunday afternoon - because sometimes the best tools come from playful experimentation!
+**A Chrome extension that enhances Claude.ai with real-time usage tracking and seamless chat management.**
 
-A simple browser extension that lets you export your ChatGPT and Claude conversations to PDF with just one click. No fuss, no complicated setup - just click and download.
+Built during a weekend vibe coding session - because the best developer tools often come from scratching your own itch.
 
-## What Does It Do?
+![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Chrome](https://img.shields.io/badge/chrome-extension-green)
+![License](https://img.shields.io/badge/license-MIT-purple)
 
-This extension adds a handy popup to your browser that lets you:
-- Export the current chat you're viewing to a nicely formatted PDF
-- Export any ChatGPT or Claude conversation by pasting its URL
-- Keep your conversations organized with automatic timestamps
+## What It Does
+
+Track your Claude usage limits in real-time and export conversations with one click. No fuss, no complicated setup.
+
+### 📊 Real-time Usage Tracking
+- Monitor your **5-hour session** limit with auto-refresh every 30 seconds
+- Track **weekly session** usage
+- Color-coded progress bars (green → yellow → orange → red)
+
+### 📋 One-Click Export
+- Single **Export Conversation** button
+- Exports entire current conversation to Markdown
+- Auto-copies to clipboard + downloads file
+- Ready to paste anywhere
+
+### 🎨 Adaptive UI
+- Integrates into Claude's sidebar (expanded or collapsed)
+- Light/dark theme support
+- Floating panel fallback
 
 ## Installation
 
-Since this is a Sunday vibe project, it's not on the Chrome Web Store (yet?). Here's how to install it manually:
+**Not on the Chrome Web Store (yet?)** - Install manually in developer mode:
 
-1. **Clone or download this repository**
+1. **Clone or download** this repository:
    ```bash
-   git clone <repo-url>
+   git clone https://github.com/yourusername/claude-track-export.git
    ```
 
-2. **Open your browser's extension page**
-   - Chrome/Edge: Navigate to `chrome://extensions/`
-   - Make sure "Developer mode" is enabled (toggle in the top right)
+2. **Open Chrome** → `chrome://extensions/`
 
-3. **Load the extension**
-   - Click "Load unpacked"
-   - Select the `App` folder from this repository
-   - The Chat Exporter icon should appear in your browser toolbar
+3. **Enable Developer Mode** (toggle in top-right)
 
-## How to Use
+4. **Click "Load unpacked"** → select the `claude-track-export` folder
 
-### Method 1: Export Current Chat
+5. **Visit** [claude.ai](https://claude.ai) - panel appears automatically in sidebar
 
-1. Open a ChatGPT or Claude conversation
-2. Click the Chat Exporter extension icon
-3. Click "Download This Chat"
-4. Wait a moment while it extracts and formats your conversation
-5. Your PDF will download automatically!
+## Usage
 
-### Method 2: Export from URL
+### Viewing Stats
 
-1. Copy the URL of any ChatGPT or Claude conversation
-2. Click the Chat Exporter extension icon
-3. Paste the URL in the input field
-4. Click "Download from URL"
-5. The extension will open the chat, extract it, and download the PDF
+Navigate to [claude.ai](https://claude.ai). The **Track & Export** panel shows:
 
-**Note:** Make sure you're logged in to the respective platform if the conversation is private!
+- **5-Hour Session**: Current usage
+- **Weekly Limit**: Total for the week
 
-## Supported Platforms
+**Color indicators:**
+- 🟢 Green: < 50% used
+- 🟡 Yellow: 50-70% used
+- 🟠 Orange: 70-90% used
+- 🔴 Red: > 90% used
 
-- [ChatGPT](https://chatgpt.com) (chatgpt.com)
-- [Claude](https://claude.ai) (claude.ai)
+### Exporting Conversations
 
-## What's Inside?
+1. Open any conversation
+2. Click **Export Conversation**
+3. Markdown file downloads + content copied to clipboard
 
-```
-ChatExpoter/
-├── App/                    # Extension source files
-│   ├── manifest.json       # Extension configuration
-│   ├── popup.html          # The popup interface
-│   ├── popup.js            # Main logic for extraction and PDF generation
-│   ├── content.js          # Content script (for future enhancements)
-│   ├── background.js       # Background service worker
-│   ├── styles.css          # Styling for the popup
-│   ├── jspdf.umd.min.js    # PDF generation library
-│   └── icons/              # Extension icons
-│       ├── icon16.png
-│       ├── icon48.png
-│       └── icon128.png
-├── README.md               # You're reading it!
-└── .gitignore             # Git ignore rules
-```
+### Export Format
 
-## Technical Details
+```markdown
+# Conversation Title
 
-- Built with vanilla JavaScript (keeping it simple!)
-- Uses [jsPDF](https://github.com/parallax/jsPDF) for PDF generation
-- Chrome Extension Manifest V3
-- Extracts conversations using DOM parsing (adapts to both ChatGPT and Claude's structures)
-
-## Known Quirks
-
-Since this was built in a playful Sunday coding session, here are some things to keep in mind:
-
-- The extension tries multiple methods to extract messages (websites change their structure often!)
-- For very long conversations, you might need to scroll through them first to ensure all messages are loaded
-- PDF formatting is simple but functional - no fancy styling (yet)
-- If extraction fails, try refreshing the page and clicking "Download" again
-
-## Future Ideas
-
-Just some random thoughts for potential improvements:
-- Add more export formats (Markdown, JSON, etc.)
-- Better PDF styling with code syntax highlighting
-- Option to include/exclude timestamps
-- Export multiple conversations at once
-- Add filters to export only specific parts of a conversation
-
-## Contributing
-
-This is a casual vibe coding project, but if you want to contribute or suggest improvements, feel free to open an issue or PR!
-
-## License
-
-Built for fun on a Sunday - use it however you like! (MIT License implied)
-
-## Disclaimer
-
-This extension is not affiliated with OpenAI or Anthropic. It's just a tool to help you keep your conversations organized.
+**Exported:** 2024-01-15
+**Messages:** 12
 
 ---
 
-Made with coffee and good vibes on a Sunday afternoon ☕✨
+### 👤 **User** 
+*2024-01-15T10:30:45.123Z*
+
+Your message here...
+
+---
+
+### 🤖 **Claude**
+*2024-01-15T10:31:12.456Z*
+
+Claude's response here...
+```
+
+## Privacy
+
+**Your data stays local:**
+
+- ✅ No data collection
+- ✅ No external servers
+- ✅ Everything stored in Chrome
+- ✅ Direct API calls to Claude only
+- ✅ Open source - review the code
+- ✅ No tracking or analytics
+
+## Technical Details
+
+### APIs Used
+- Chrome Extension APIs (storage, tabs, clipboardWrite)
+- Claude.ai internal APIs (usage, conversations)
+- Fetch API interception for rate limit tracking
+
+### File Structure
+
+```
+claude-track-export/
+├── manifest.json        # Extension manifest (v3)
+├── icons/              # Extension icons
+│   ├── icon16.png
+│   ├── icon32.png
+│   ├── icon48.png
+│   └── icon128.png
+├── src/
+│   ├── content.js      # Main content script
+│   ├── styles.css      # Panel styles
+│   ├── background.js   # Service worker
+│   ├── popup.html      # Toolbar popup
+│   ├── popup.js        # Popup logic
+│   └── injected.js     # Network interceptor
+└── README.md
+```
+
+### Permissions
+- `storage`: Save settings locally
+- `clipboardWrite`: Copy exports to clipboard
+- `tabs`: Detect active Claude.ai tabs
+- `host_permissions`: Access claude.ai for API calls
+
+## Troubleshooting
+
+### Panel not appearing?
+1. Confirm you're on [claude.ai](https://claude.ai)
+2. Refresh the page
+3. Verify extension is enabled in `chrome://extensions`
+
+### Export not working?
+1. Open an active conversation
+2. Check browser console for errors
+3. Use the manual refresh button in the popup
+
+### Usage showing 0%?
+- Data updates as you use Claude
+- Make a few messages to trigger refresh
+- Claude may not expose limits on all endpoints
+
+## Known Quirks
+
+Built over a weekend, so keep in mind:
+
+- Panel placement adapts to sidebar state (may take a refresh)
+- Very long conversations need to be scrolled to load all messages
+- Usage data depends on Claude's API responses
+
+## Future Ideas
+
+Potential improvements for future vibe coding sessions:
+
+- Export to additional formats (JSON, HTML)
+- Batch export multiple conversations
+- Advanced filtering for specific message types
+- Enhanced PDF export with styling
+- Custom usage alerts/notifications
+
+## Contributing
+
+Built for fun, but contributions welcome:
+
+1. Fork the repository
+2. Create feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'Add feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Open Pull Request
+
+## License
+
+MIT License - use however you like.
+
+## Disclaimer
+
+Not affiliated with Anthropic. Just a tool to enhance your Claude experience.
+
+---
+
+**Made with coffee and good vibes for the Claude community** ☕✨
