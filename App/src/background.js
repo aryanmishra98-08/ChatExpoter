@@ -13,12 +13,11 @@ const STORAGE_KEYS = {
 
 // Default settings
 const DEFAULT_SETTINGS = {
-  refreshInterval: 30000,
+  autoRefresh: true,
   autoOpenNewChat: true,
   copyToClipboard: true,
   showNotifications: true,
-  playSoundNotifications: true,
-  theme: 'auto'
+  playSoundNotifications: true
 };
 
 // Initialize extension on install
@@ -111,16 +110,6 @@ async function handleSaveSettings(data, sendResponse) {
 
 async function handleLogExport(data, sendResponse) {
   try {
-    // ENFORCE: Check if export/clipboard is enabled before logging
-    const settingsResult = await chrome.storage.local.get(STORAGE_KEYS.SETTINGS);
-    const settings = settingsResult[STORAGE_KEYS.SETTINGS] || DEFAULT_SETTINGS;
-    
-    if (!settings.copyToClipboard) {
-      console.log('[Claude Track] Export blocked - copyToClipboard setting is disabled');
-      sendResponse({ success: false, error: 'Export is disabled in settings' });
-      return;
-    }
-    
     const result = await chrome.storage.local.get(STORAGE_KEYS.EXPORT_HISTORY);
     const history = result[STORAGE_KEYS.EXPORT_HISTORY] || [];
     
@@ -158,16 +147,6 @@ async function handleLogExport(data, sendResponse) {
 
 async function handleLogRefresh(sendResponse) {
   try {
-    // ENFORCE: Check if autoRefresh is enabled before logging
-    const settingsResult = await chrome.storage.local.get(STORAGE_KEYS.SETTINGS);
-    const settings = settingsResult[STORAGE_KEYS.SETTINGS] || DEFAULT_SETTINGS;
-    
-    if (!settings.autoRefresh) {
-      console.log('[Claude Track] Refresh blocked - autoRefresh setting is disabled');
-      sendResponse({ success: false, error: 'Auto-refresh is disabled in settings' });
-      return;
-    }
-
     const metricsResult = await chrome.storage.local.get(STORAGE_KEYS.SESSION_METRICS);
     const metrics = metricsResult[STORAGE_KEYS.SESSION_METRICS] || {
       totalRefreshes: 0,
@@ -269,12 +248,16 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 // Storage change listener for sync across tabs
 chrome.storage.onChanged.addListener((changes, namespace) => {
   if (namespace === 'local') {
-    // Broadcast changes to all Claude tabs
+    // Broadcast changes to all Claude tabs (excluding /code where content script doesn't run)
     chrome.tabs.query({ url: 'https://claude.ai/*' }, (tabs) => {
       tabs.forEach(tab => {
-        chrome.tabs.sendMessage(tab.id, { 
-          type: 'STORAGE_CHANGED', 
-          changes 
+        // Skip tabs that are on /code path where content script is excluded
+        if (tab.url && (tab.url.includes('claude.ai/code/') || tab.url.endsWith('claude.ai/code'))) {
+          return;
+        }
+        chrome.tabs.sendMessage(tab.id, {
+          type: 'STORAGE_CHANGED',
+          changes
         }).catch(() => {});
       });
     });

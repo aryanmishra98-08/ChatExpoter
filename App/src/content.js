@@ -24,7 +24,17 @@
       autoOpenNewChat: true,
       showNotifications: true,
       playSoundNotifications: true
-    }
+    },
+    // Cleanup tracking to prevent memory leaks
+    observers: {
+      sidebar: null,
+      urlChanges: null
+    },
+    listeners: {
+      resize: null,
+      message: null
+    },
+    listenersAttached: false
   };
 
   // ============================================
@@ -125,11 +135,13 @@
 
     state.usageData = usageData;
     state.lastRefresh = new Date();
-    
+
     try {
       chrome.storage.local.set({ [CONFIG.STORAGE_KEY]: usageData });
-    } catch (e) {}
-    
+    } catch (e) {
+      console.error('[Claude Track] Error saving usage data to storage:', e);
+    }
+
     return usageData;
   }
 
@@ -137,7 +149,7 @@
   // Export Functions
   // ============================================
   function getCurrentConversationId() {
-    const match = window.location.pathname.match(/\/chat\/([a-f0-9-]+)/);
+    const match = window.location.pathname.match(/\/chat\/([a-fA-F0-9-]+)/);
     return match ? match[1] : null;
   }
 
@@ -194,16 +206,6 @@
   }
 
   async function exportConversation() {
-    // ENFORCE: Check if export is enabled
-    const settings = await loadSettings();
-    
-    // If copyToClipboard is disabled AND we need to check export separately
-    // For now, we'll treat it as: export includes clipboard copy
-    if (!settings.copyToClipboard) {
-      showModal('Export Disabled', 'Export is disabled in settings');
-      return;
-    }
-
     const conversationId = getCurrentConversationId();
     if (!conversationId) {
       showModal('Export Failed', 'Please open a conversation to export it.');
@@ -232,9 +234,9 @@
       const markdown = convertToMarkdown(messages, conversation.name);
       const title = (conversation.name || 'conversation').replace(/[^a-z0-9]/gi, '_').toLowerCase();
       downloadMarkdown(markdown, `claude_${title}_${Date.now()}.md`);
-      
-      // ENFORCE: Only copy to clipboard if setting is enabled
-      if (settings.copyToClipboard) {
+
+      // Only copy to clipboard if setting is enabled
+      if (state.settings.copyToClipboard) {
         await copyToClipboard(markdown);
       }
       
@@ -480,7 +482,7 @@
     try {
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
       const now = audioContext.currentTime;
-      
+
       if (type === 'success') {
         // Success: Two ascending beeps
         const osc1 = audioContext.createOscillator();
@@ -492,7 +494,7 @@
         gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
         osc1.start(now);
         osc1.stop(now + 0.1);
-        
+
         const osc2 = audioContext.createOscillator();
         const gain2 = audioContext.createGain();
         osc2.connect(gain2);
@@ -513,7 +515,7 @@
         gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
         osc1.start(now);
         osc1.stop(now + 0.1);
-        
+
         const osc2 = audioContext.createOscillator();
         const gain2 = audioContext.createGain();
         osc2.connect(gain2);
@@ -524,6 +526,11 @@
         osc2.start(now + 0.15);
         osc2.stop(now + 0.25);
       }
+
+      // Close audio context after sound completes to prevent memory leak
+      setTimeout(() => {
+        audioContext.close();
+      }, 500);
     } catch (error) {
       console.log('[Claude Track] Sound notification error:', error);
     }
@@ -555,11 +562,19 @@
         ${title ? `<div class="cte-banner-title">${title}</div>` : ''}
         <div class="cte-banner-message">${message}</div>
       </div>
-      <button class="cte-banner-close" onclick="document.getElementById('cte-banner').classList.remove('cte-banner-show')">&times;</button>
+      <button class="cte-banner-close" id="cte-banner-close-btn">&times;</button>
     `;
 
     banner.className = `cte-banner cte-banner-${type} cte-banner-show`;
     console.log('[Claude Track] Showing banner:', title || message, type);
+
+    // Add close button event listener (remove inline onclick for security)
+    const closeBtn = document.getElementById('cte-banner-close-btn');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        banner.classList.remove('cte-banner-show');
+      }, { once: true });
+    }
 
     if (duration > 0) {
       setTimeout(() => {
@@ -666,6 +681,11 @@
     // Initial sync
     syncPanelWithSidebar();
 
+    // Disconnect previous observer if it exists
+    if (state.observers.sidebar) {
+      state.observers.sidebar.disconnect();
+    }
+
     // Create observer for sidebar changes
     const observer = new MutationObserver(() => {
       requestAnimationFrame(syncPanelWithSidebar);
@@ -673,19 +693,30 @@
 
     // Observe sidebar and its parents
     observer.observe(sidebar, { attributes: true, attributeFilter: ['class', 'style'] });
-    
+
     let parent = sidebar.parentElement;
     while (parent && parent !== document.body) {
       observer.observe(parent, { attributes: true, attributeFilter: ['class', 'style'] });
       parent = parent.parentElement;
     }
 
-    // Also handle window resize
+    // Store observer for cleanup
+    state.observers.sidebar = observer;
+
+    // Remove previous resize listener if it exists
+    if (state.listeners.resize) {
+      window.removeEventListener('resize', state.listeners.resize);
+    }
+
+    // Handle window resize
     let resizeTimeout;
-    window.addEventListener('resize', () => {
+    const resizeHandler = () => {
       clearTimeout(resizeTimeout);
       resizeTimeout = setTimeout(syncPanelWithSidebar, 100);
-    });
+    };
+
+    window.addEventListener('resize', resizeHandler);
+    state.listeners.resize = resizeHandler;
   }
 
   // ============================================
@@ -713,13 +744,6 @@
     const refreshBtn = document.getElementById('cte-manual-refresh');
     if (refreshBtn) {
       refreshBtn.addEventListener('click', async () => {
-        // ENFORCE: Check if auto-refresh is enabled before allowing manual refresh
-        const settings = await loadSettings();
-        if (!settings.autoRefresh) {
-          showModal('Refresh Disabled', 'Auto-refresh is disabled in settings');
-          return;
-        }
-
         refreshBtn.classList.add('cte-spinning');
         await fetchUsageData();
         updatePanelUI();
@@ -736,7 +760,6 @@
           }
         });
       });
-      // ENFORCE: Update refresh button state based on settings
       updateRefreshButtonState(refreshBtn);
     }
 
@@ -744,79 +767,71 @@
     const exportBtn = document.getElementById('cte-export-btn');
     if (exportBtn) {
       exportBtn.addEventListener('click', exportConversation);
-      // ENFORCE: Disable export button if setting is disabled
       updateExportButtonState(exportBtn);
     }
 
-    // Expand button (collapsed view) - clicking icon also triggers export for quick action
+    // Expand button (collapsed view) - clicking icon triggers export for quick action
     const expandBtn = document.getElementById('cte-expand-btn');
     if (expandBtn) {
       expandBtn.addEventListener('click', exportConversation);
-      // ENFORCE: Disable expand button if setting is disabled
       updateExportButtonState(expandBtn);
     }
 
-    // Listen for settings changes from popup
-    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      if (message.type === 'SETTINGS_CHANGED') {
-        state.settings = message.settings;
-        console.log('[Claude Track] Settings updated:', message.settings);
-        
-        // Update button states
-        const exportBtn = document.getElementById('cte-export-btn');
-        const expandBtn = document.getElementById('cte-expand-btn');
-        const refreshBtn = document.getElementById('cte-manual-refresh');
-        
-        if (exportBtn) updateExportButtonState(exportBtn);
-        if (expandBtn) updateExportButtonState(expandBtn);
-        if (refreshBtn) updateRefreshButtonState(refreshBtn);
-        
-        // ENFORCE: Restart/stop auto-refresh timer based on new settings
-        if (state.settings.autoRefresh) {
-          startRefreshTimer();
-          console.log('[Claude Track] Auto-refresh timer restarted');
-        } else {
-          stopRefreshTimer();
-          console.log('[Claude Track] Auto-refresh timer stopped');
+    // Listen for settings changes from popup (only attach once)
+    if (!state.listenersAttached) {
+      const messageHandler = (message, sender, sendResponse) => {
+        if (message.type === 'SETTINGS_CHANGED') {
+          state.settings = message.settings;
+          console.log('[Claude Track] Settings updated:', message.settings);
+
+          // Update button states
+          const exportBtn = document.getElementById('cte-export-btn');
+          const expandBtn = document.getElementById('cte-expand-btn');
+          const refreshBtn = document.getElementById('cte-manual-refresh');
+
+          if (exportBtn) updateExportButtonState(exportBtn);
+          if (expandBtn) updateExportButtonState(expandBtn);
+          if (refreshBtn) updateRefreshButtonState(refreshBtn);
+
+          // Restart/stop auto-refresh timer based on new settings
+          if (state.settings.autoRefresh) {
+            startRefreshTimer();
+            console.log('[Claude Track] Auto-refresh timer restarted');
+          } else {
+            stopRefreshTimer();
+            console.log('[Claude Track] Auto-refresh timer stopped');
+          }
         }
-      }
-    });
+      };
+
+      chrome.runtime.onMessage.addListener(messageHandler);
+      state.listeners.message = messageHandler;
+      state.listenersAttached = true;
+    }
   }
 
   function updateExportButtonState(btn) {
-    const isEnabled = state.settings.copyToClipboard;
-    btn.disabled = !isEnabled;
-    btn.title = isEnabled 
-      ? 'Export Conversation' 
-      : 'Export is disabled in settings';
-    
-    if (!isEnabled) {
-      btn.classList.add('cte-disabled');
-      btn.style.opacity = '0.5';
-      btn.style.cursor = 'not-allowed';
-    } else {
-      btn.classList.remove('cte-disabled');
-      btn.style.opacity = '1';
-      btn.style.cursor = 'pointer';
-    }
+    // Export is always enabled (download works regardless of clipboard setting)
+    btn.disabled = false;
+    const clipboardEnabled = state.settings.copyToClipboard;
+    btn.title = clipboardEnabled
+      ? 'Export Conversation (download + copy to clipboard)'
+      : 'Export Conversation (download only, clipboard disabled in settings)';
+    btn.classList.remove('cte-disabled');
+    btn.style.opacity = '1';
+    btn.style.cursor = 'pointer';
   }
 
   function updateRefreshButtonState(btn) {
-    const isEnabled = state.settings.autoRefresh;
-    btn.disabled = !isEnabled;
-    btn.title = isEnabled 
-      ? 'Refresh' 
-      : 'Auto-refresh is disabled in settings';
-    
-    if (!isEnabled) {
-      btn.classList.add('cte-disabled');
-      btn.style.opacity = '0.5';
-      btn.style.cursor = 'not-allowed';
-    } else {
-      btn.classList.remove('cte-disabled');
-      btn.style.opacity = '1';
-      btn.style.cursor = 'pointer';
-    }
+    // Manual refresh is always enabled (autoRefresh setting only controls automatic timer)
+    btn.disabled = false;
+    const autoRefreshEnabled = state.settings.autoRefresh;
+    btn.title = autoRefreshEnabled
+      ? 'Refresh usage data'
+      : 'Refresh usage data (auto-refresh disabled, only manual refresh available)';
+    btn.classList.remove('cte-disabled');
+    btn.style.opacity = '1';
+    btn.style.cursor = 'pointer';
   }
 
   function startRefreshTimer() {
@@ -852,7 +867,41 @@
     }
   }
 
+  // Cleanup function to prevent memory leaks
+  function cleanup() {
+    // Stop refresh timer
+    stopRefreshTimer();
+
+    // Disconnect all observers
+    if (state.observers.sidebar) {
+      state.observers.sidebar.disconnect();
+      state.observers.sidebar = null;
+    }
+    if (state.observers.urlChanges) {
+      state.observers.urlChanges.disconnect();
+      state.observers.urlChanges = null;
+    }
+
+    // Remove event listeners
+    if (state.listeners.resize) {
+      window.removeEventListener('resize', state.listeners.resize);
+      state.listeners.resize = null;
+    }
+    if (state.listeners.message) {
+      chrome.runtime.onMessage.removeListener(state.listeners.message);
+      state.listeners.message = null;
+      state.listenersAttached = false;
+    }
+
+    console.log('[Claude Track] Cleanup completed');
+  }
+
   function observeUrlChanges() {
+    // Disconnect previous observer if it exists
+    if (state.observers.urlChanges) {
+      state.observers.urlChanges.disconnect();
+    }
+
     let lastUrl = window.location.href;
     const observer = new MutationObserver(() => {
       if (window.location.href !== lastUrl) {
@@ -865,6 +914,9 @@
       }
     });
     observer.observe(document.body, { childList: true, subtree: true });
+
+    // Store observer for cleanup
+    state.observers.urlChanges = observer;
   }
 
   // ============================================

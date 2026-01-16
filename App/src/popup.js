@@ -44,11 +44,13 @@ async function loadSettings() {
     const clipboard = document.getElementById('setting-clipboard');
     const newChat = document.getElementById('setting-newchat');
     const notifications = document.getElementById('setting-notifications');
-    
+    const sounds = document.getElementById('setting-sounds');
+
     if (autoRefresh) autoRefresh.checked = settings.autoRefresh !== false;
     if (clipboard) clipboard.checked = settings.copyToClipboard !== false;
     if (newChat) newChat.checked = settings.autoOpenNewChat !== false;
     if (notifications) notifications.checked = settings.showNotifications !== false;
+    if (sounds) sounds.checked = settings.playSoundNotifications !== false;
   } catch (error) {
     console.error('Error loading settings:', error);
   }
@@ -105,7 +107,8 @@ async function saveSettings() {
       autoRefresh: document.getElementById('setting-autorefresh')?.checked ?? true,
       copyToClipboard: document.getElementById('setting-clipboard')?.checked ?? true,
       autoOpenNewChat: document.getElementById('setting-newchat')?.checked ?? true,
-      showNotifications: document.getElementById('setting-notifications')?.checked ?? true
+      showNotifications: document.getElementById('setting-notifications')?.checked ?? true,
+      playSoundNotifications: document.getElementById('setting-sounds')?.checked ?? true
     };
     
     await chrome.storage.local.set({ claude_track_export_settings: settings });
