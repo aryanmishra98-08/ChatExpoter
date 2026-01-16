@@ -396,14 +396,7 @@
     `;
     document.body.appendChild(modal);
     
-    // Close handlers
-    const closeModal = () => {
-      modal.classList.add('cte-modal-hide');
-      setTimeout(() => {
-        modal.classList.remove('cte-modal-show', 'cte-modal-hide');
-      }, 300);
-    };
-    
+    // Close button handler
     document.getElementById('cte-modal-close').addEventListener('click', closeModal);
     document.getElementById('cte-modal-ok').addEventListener('click', closeModal);
     
@@ -411,6 +404,202 @@
     modal.addEventListener('click', (e) => {
       if (e.target === modal) closeModal();
     });
+  }
+
+  function updatePanelUI() {
+    const data = state.usageData;
+    if (!data) return;
+
+    const usageBars = document.getElementById('cte-usage-bars');
+    if (usageBars) {
+      usageBars.innerHTML = `
+        ${createUsageBar(data.sessionLimit, 'cte-session')}
+        ${createUsageBar(data.weeklyLimit, 'cte-weekly')}
+      `;
+    }
+
+    // Update mini indicators
+    const miniDots = document.querySelectorAll('.cte-mini-dot');
+    if (miniDots.length >= 2) {
+      miniDots[0].style.backgroundColor = getProgressColor(data.sessionLimit.utilization);
+      miniDots[0].title = `5H: ${data.sessionLimit.utilization}%`;
+      miniDots[1].style.backgroundColor = getProgressColor(data.weeklyLimit.utilization);
+      miniDots[1].title = `7D: ${data.weeklyLimit.utilization}%`;
+    }
+
+    const refreshText = document.getElementById('cte-refresh-text');
+    if (refreshText && state.lastRefresh) {
+      refreshText.textContent = `Updated ${state.lastRefresh.toLocaleTimeString()}`;
+    }
+  }
+
+  function showNotification(message, type = 'info') {
+    // Check if notifications are enabled before showing
+    if (!state.settings.showNotifications) {
+      console.log('[Claude Track] Notification blocked - setting disabled:', message);
+      return;
+    }
+    
+    const notification = document.getElementById('cte-notification');
+    if (!notification) {
+      console.log('[Claude Track] Notification element not found');
+      return;
+    }
+    
+    console.log('[Claude Track] Showing notification:', message, type);
+    notification.className = `cte-notification cte-notification-${type} cte-notification-show`;
+    notification.textContent = message;
+    setTimeout(() => notification.classList.remove('cte-notification-show'), 3000);
+  }
+
+  function sendBrowserNotification(title, message, priority = 0) {
+    // Send browser notification via background service worker
+    chrome.runtime.sendMessage({
+      type: 'SEND_NOTIFICATION',
+      data: {
+        title,
+        message,
+        priority
+      }
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.log('[Claude Track] Notification error:', chrome.runtime.lastError);
+      } else if (response && response.success) {
+        console.log('[Claude Track] Browser notification sent');
+      }
+    });
+  }
+
+  function playSound(type = 'success') {
+    // Check if sound notifications are enabled
+    if (!state.settings.playSoundNotifications) {
+      return;
+    }
+
+    // Use Web Audio API to create sound notifications
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const now = audioContext.currentTime;
+      
+      if (type === 'success') {
+        // Success: Two ascending beeps
+        const osc1 = audioContext.createOscillator();
+        const gain1 = audioContext.createGain();
+        osc1.connect(gain1);
+        gain1.connect(audioContext.destination);
+        osc1.frequency.setValueAtTime(800, now);
+        gain1.gain.setValueAtTime(0.3, now);
+        gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+        osc1.start(now);
+        osc1.stop(now + 0.1);
+        
+        const osc2 = audioContext.createOscillator();
+        const gain2 = audioContext.createGain();
+        osc2.connect(gain2);
+        gain2.connect(audioContext.destination);
+        osc2.frequency.setValueAtTime(1000, now + 0.15);
+        gain2.gain.setValueAtTime(0.3, now + 0.15);
+        gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+        osc2.start(now + 0.15);
+        osc2.stop(now + 0.25);
+      } else if (type === 'error') {
+        // Error: Two descending beeps
+        const osc1 = audioContext.createOscillator();
+        const gain1 = audioContext.createGain();
+        osc1.connect(gain1);
+        gain1.connect(audioContext.destination);
+        osc1.frequency.setValueAtTime(600, now);
+        gain1.gain.setValueAtTime(0.3, now);
+        gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+        osc1.start(now);
+        osc1.stop(now + 0.1);
+        
+        const osc2 = audioContext.createOscillator();
+        const gain2 = audioContext.createGain();
+        osc2.connect(gain2);
+        gain2.connect(audioContext.destination);
+        osc2.frequency.setValueAtTime(400, now + 0.15);
+        gain2.gain.setValueAtTime(0.3, now + 0.15);
+        gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+        osc2.start(now + 0.15);
+        osc2.stop(now + 0.25);
+      }
+    } catch (error) {
+      console.log('[Claude Track] Sound notification error:', error);
+    }
+  }
+
+  function showBanner(message, type = 'info', duration = 5000, title = null) {
+    // Check if notifications are enabled
+    if (!state.settings.showNotifications) {
+      console.log('[Claude Track] Banner blocked - setting disabled:', message);
+      return;
+    }
+
+    const banner = document.getElementById('cte-banner');
+    if (!banner) {
+      console.log('[Claude Track] Banner element not found');
+      return;
+    }
+
+    const icon = {
+      success: '✓',
+      error: '✕',
+      warning: '⚠',
+      info: 'ℹ'
+    }[type] || 'ℹ';
+
+    banner.innerHTML = `
+      <div class="cte-banner-icon">${icon}</div>
+      <div class="cte-banner-content">
+        ${title ? `<div class="cte-banner-title">${title}</div>` : ''}
+        <div class="cte-banner-message">${message}</div>
+      </div>
+      <button class="cte-banner-close" onclick="document.getElementById('cte-banner').classList.remove('cte-banner-show')">&times;</button>
+    `;
+
+    banner.className = `cte-banner cte-banner-${type} cte-banner-show`;
+    console.log('[Claude Track] Showing banner:', title || message, type);
+
+    if (duration > 0) {
+      setTimeout(() => {
+        banner.classList.remove('cte-banner-show');
+      }, duration);
+    }
+  }
+
+  function showModal(title, message, type = 'error') {
+    // Check if notifications are enabled
+    if (!state.settings.showNotifications) {
+      console.log('[Claude Track] Modal blocked - setting disabled:', title);
+      return;
+    }
+
+    const overlay = document.getElementById('cte-modal-overlay');
+    if (!overlay) {
+      console.log('[Claude Track] Modal overlay not found');
+      return;
+    }
+
+    const titleEl = document.getElementById('cte-modal-title');
+    const bodyEl = document.getElementById('cte-modal-body');
+    
+    if (titleEl) titleEl.textContent = title;
+    if (bodyEl) bodyEl.textContent = message;
+
+    overlay.classList.add('cte-modal-show');
+    overlay.classList.remove('cte-modal-hide');
+    console.log('[Claude Track] Showing modal:', title);
+  }
+
+  function closeModal() {
+    const overlay = document.getElementById('cte-modal-overlay');
+    if (overlay) {
+      overlay.classList.add('cte-modal-hide');
+      setTimeout(() => {
+        overlay.classList.remove('cte-modal-show', 'cte-modal-hide');
+      }, 300);
+    }
   }
 
   // ============================================
