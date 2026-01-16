@@ -106,6 +106,16 @@ async function handleSaveSettings(data, sendResponse) {
 
 async function handleLogExport(data, sendResponse) {
   try {
+    // ENFORCE: Check if export/clipboard is enabled before logging
+    const settingsResult = await chrome.storage.local.get(STORAGE_KEYS.SETTINGS);
+    const settings = settingsResult[STORAGE_KEYS.SETTINGS] || DEFAULT_SETTINGS;
+    
+    if (!settings.copyToClipboard) {
+      console.log('[Claude Track] Export blocked - copyToClipboard setting is disabled');
+      sendResponse({ success: false, error: 'Export is disabled in settings' });
+      return;
+    }
+    
     const result = await chrome.storage.local.get(STORAGE_KEYS.EXPORT_HISTORY);
     const history = result[STORAGE_KEYS.EXPORT_HISTORY] || [];
     

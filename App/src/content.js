@@ -17,12 +17,36 @@
     orgId: null,
     isSidebarCollapsed: false,
     refreshTimer: null,
-    lastRefresh: null
+    lastRefresh: null,
+    settings: {
+      autoRefresh: true,
+      copyToClipboard: true,
+      autoOpenNewChat: true,
+      showNotifications: true
+    }
   };
 
   // ============================================
   // Utility Functions
   // ============================================
+  async function loadSettings() {
+    try {
+      const result = await chrome.storage.local.get('claude_track_export_settings');
+      const settings = result.claude_track_export_settings || {
+        autoRefresh: true,
+        copyToClipboard: true,
+        autoOpenNewChat: true,
+        showNotifications: true
+      };
+      state.settings = settings;
+      console.log('[Claude Track] Settings loaded:', settings);
+      return settings;
+    } catch (error) {
+      console.error('[Claude Track] Error loading settings:', error);
+      return state.settings;
+    }
+  }
+
   function getProgressColor(percentage) {
     if (percentage >= 90) return '#ef4444';
     if (percentage >= 70) return '#f59e0b';
@@ -168,6 +192,16 @@
   }
 
   async function exportConversation() {
+    // ENFORCE: Check if export is enabled
+    const settings = await loadSettings();
+    
+    // If copyToClipboard is disabled AND we need to check export separately
+    // For now, we'll treat it as: export includes clipboard copy
+    if (!settings.copyToClipboard) {
+      showNotification('Export is disabled in settings', 'error');
+      return;
+    }
+
     const conversationId = getCurrentConversationId();
     if (!conversationId) {
       showNotification('No conversation open', 'error');
@@ -196,7 +230,11 @@
       const markdown = convertToMarkdown(messages, conversation.name);
       const title = (conversation.name || 'conversation').replace(/[^a-z0-9]/gi, '_').toLowerCase();
       downloadMarkdown(markdown, `claude_${title}_${Date.now()}.md`);
-      await copyToClipboard(markdown);
+      
+      // ENFORCE: Only copy to clipboard if setting is enabled
+      if (settings.copyToClipboard) {
+        await copyToClipboard(markdown);
+      }
       
       // Log export to background script for metrics tracking
       chrome.runtime.sendMessage({
@@ -503,12 +541,48 @@
     const exportBtn = document.getElementById('cte-export-btn');
     if (exportBtn) {
       exportBtn.addEventListener('click', exportConversation);
+      // ENFORCE: Disable export button if setting is disabled
+      updateExportButtonState(exportBtn);
     }
 
     // Expand button (collapsed view) - clicking icon also triggers export for quick action
     const expandBtn = document.getElementById('cte-expand-btn');
     if (expandBtn) {
       expandBtn.addEventListener('click', exportConversation);
+      // ENFORCE: Disable expand button if setting is disabled
+      updateExportButtonState(expandBtn);
+    }
+
+    // Listen for settings changes from popup
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      if (message.type === 'SETTINGS_CHANGED') {
+        state.settings = message.settings;
+        console.log('[Claude Track] Settings updated:', message.settings);
+        
+        // Update button states
+        const exportBtn = document.getElementById('cte-export-btn');
+        const expandBtn = document.getElementById('cte-expand-btn');
+        if (exportBtn) updateExportButtonState(exportBtn);
+        if (expandBtn) updateExportButtonState(expandBtn);
+      }
+    });
+  }
+
+  function updateExportButtonState(btn) {
+    const isEnabled = state.settings.copyToClipboard;
+    btn.disabled = !isEnabled;
+    btn.title = isEnabled 
+      ? 'Export Conversation' 
+      : 'Export is disabled in settings';
+    
+    if (!isEnabled) {
+      btn.classList.add('cte-disabled');
+      btn.style.opacity = '0.5';
+      btn.style.cursor = 'not-allowed';
+    } else {
+      btn.classList.remove('cte-disabled');
+      btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
     }
   }
 
@@ -557,6 +631,10 @@
     }
 
     await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // ENFORCE: Load settings first to initialize state
+    await loadSettings();
+    
     await fetchUsageData();
     injectPanel();
     startRefreshTimer();
