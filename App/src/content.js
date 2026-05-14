@@ -57,13 +57,13 @@
       try {
         const response = await fetch(url, {
           credentials: 'include',
-          headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }
+          headers: { 'Accept': 'application/json' }
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return await response.json();
       } catch (error) {
         console.error(`[Claude Track] Fetch error (attempt ${attempt + 1}/${maxRetries + 1}):`, error);
-        if (attempt < maxRetries && error.message.includes('Failed to fetch')) {
+        if (attempt < maxRetries) {
           await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
         }
       }
@@ -121,7 +121,7 @@
   // UI Components
   // ============================================
   function createUsageBar(data, id) {
-    const percentage = data.utilization;
+    const percentage = Math.min(100, Math.max(0, data.utilization));
     const color = getProgressColor(percentage);
     const resetInfo = data.resetTime ? formatTimeRemaining(data.resetTime) : '';
 
@@ -218,7 +218,7 @@
     const item = document.getElementById(id);
     if (!item) return;
 
-    const percentage = data.utilization;
+    const percentage = Math.min(100, Math.max(0, data.utilization));
     const color = getProgressColor(percentage);
     const resetInfo = data.resetTime ? formatTimeRemaining(data.resetTime) : '';
 
@@ -325,6 +325,14 @@
     const panel = document.getElementById(CONFIG.PANEL_ID);
     if (panel) panel.remove();
     stopRefreshTimer();
+    if (state.observers.sidebar) {
+      state.observers.sidebar.disconnect();
+      state.observers.sidebar = null;
+    }
+    if (state.listeners.resize) {
+      window.removeEventListener('resize', state.listeners.resize);
+      state.listeners.resize = null;
+    }
   }
 
   function startRefreshTimer() {
