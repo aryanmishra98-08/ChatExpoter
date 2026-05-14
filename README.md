@@ -1,4 +1,4 @@
-# Claude Track & Export
+# Claude Meter - Real-Time Usage Tracker for Claude.ai
 
 **A Chrome extension that enhances Claude.ai with real-time usage tracking.**
 
@@ -28,7 +28,7 @@ Track your Claude usage limits in real-time. No fuss, no complicated setup.
 
 1. **Clone or download** this repository:
    ```bash
-   git clone https://github.com/yourusername/ChatExpoter.git
+   git clone https://github.com/aryanmishra98-08/ClaudeMeter.git
    ```
 
 2. **Open Chrome** → `chrome://extensions/`
@@ -74,7 +74,7 @@ Navigate to [claude.ai](https://claude.ai). The **Track & Export** panel shows:
 ### File Structure
 
 ```
-ChatExpoter/
+ClaudeMeter/
 ├── LICENSE             # MIT License
 ├── README.md           # Documentation
 └── App/
