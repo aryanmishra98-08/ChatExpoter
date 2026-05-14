@@ -1,6 +1,6 @@
-# Claude Track & Export
+# Claude Meter - Real-Time Usage Tracker for Claude.ai
 
-**A Chrome extension that enhances Claude.ai with real-time usage tracking and seamless chat management.**
+**A Chrome extension that enhances Claude.ai with real-time usage tracking.**
 
 Built during a weekend vibe coding session - because the best developer tools often come from scratching your own itch.
 
@@ -10,18 +10,12 @@ Built during a weekend vibe coding session - because the best developer tools of
 
 ## What It Does
 
-Track your Claude usage limits in real-time and export conversations with one click. No fuss, no complicated setup.
+Track your Claude usage limits in real-time. No fuss, no complicated setup.
 
 ### 📊 Real-time Usage Tracking
 - Monitor your **5-hour session** limit with auto-refresh every 30 seconds
 - Track **weekly session** usage
 - Color-coded progress bars (green → yellow → orange → red)
-
-### 📋 One-Click Export
-- Single **Export Conversation** button
-- Exports entire current conversation to Markdown
-- Auto-copies to clipboard + downloads file
-- Ready to paste anywhere
 
 ### 🎨 Adaptive UI
 - Integrates into Claude's sidebar (expanded or collapsed)
@@ -34,7 +28,7 @@ Track your Claude usage limits in real-time and export conversations with one cl
 
 1. **Clone or download** this repository:
    ```bash
-   git clone https://github.com/yourusername/ChatExpoter.git
+   git clone https://github.com/aryanmishra98-08/ClaudeMeter.git
    ```
 
 2. **Open Chrome** → `chrome://extensions/`
@@ -60,35 +54,6 @@ Navigate to [claude.ai](https://claude.ai). The **Track & Export** panel shows:
 - 🟠 Orange: 70-90% used
 - 🔴 Red: > 90% used
 
-### Exporting Conversations
-
-1. Open any conversation
-2. Click **Export Conversation**
-3. Markdown file downloads + content copied to clipboard
-
-### Export Format
-
-```markdown
-# Conversation Title
-
-**Exported:** 2024-01-15
-**Messages:** 12
-
----
-
-### 👤 **User** 
-*2024-01-15T10:30:45.123Z*
-
-Your message here...
-
----
-
-### 🤖 **Claude**
-*2024-01-15T10:31:12.456Z*
-
-Claude's response here...
-```
-
 ## Privacy
 
 **Your data stays local:**
@@ -103,14 +68,13 @@ Claude's response here...
 ## Technical Details
 
 ### APIs Used
-- Chrome Extension APIs (storage, tabs, clipboardWrite)
-- Claude.ai internal APIs (usage, conversations)
-- Fetch API interception for rate limit tracking
+- Chrome Extension APIs (storage, tabs)
+- Claude.ai internal APIs (usage)
 
 ### File Structure
 
 ```
-ChatExpoter/
+ClaudeMeter/
 ├── LICENSE             # MIT License
 ├── README.md           # Documentation
 └── App/
@@ -123,15 +87,13 @@ ChatExpoter/
     └── src/
         ├── background.js   # Service worker
         ├── content.js      # Main content script
-        ├── injected.js     # Network interceptor
         ├── popup.html      # Toolbar popup
         ├── popup.js        # Popup logic
         └── styles.css      # Panel styles
 ```
 
 ### Permissions
-- `storage`: Save settings locally
-- `clipboardWrite`: Copy exports to clipboard
+- `storage`: Save usage data locally
 - `tabs`: Detect active Claude.ai tabs
 - `host_permissions`: Access claude.ai for API calls
 
@@ -141,11 +103,6 @@ ChatExpoter/
 1. Confirm you're on [claude.ai](https://claude.ai)
 2. Refresh the page
 3. Verify extension is enabled in `chrome://extensions`
-
-### Export not working?
-1. Open an active conversation
-2. Check browser console for errors
-3. Use the manual refresh button in the popup
 
 ### Usage showing 0%?
 - Data updates as you use Claude
