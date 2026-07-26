@@ -8,6 +8,7 @@
 
   const CONFIG = {
     REFRESH_INTERVAL: 30000,
+    MIN_REFRESH_GAP: 10000,
     PANEL_ID: 'claude-track-export-panel',
     STORAGE_KEY: 'claude_track_export_data'
   };
@@ -23,13 +24,18 @@
       urlChanges: null
     },
     listeners: {
-      resize: null
+      resize: null,
+      visibility: null
     }
   };
 
   // ============================================
   // Utility Functions
   // ============================================
+  function normalizePct(value) {
+    return Math.round(Math.min(100, Math.max(0, Number(value) || 0)));
+  }
+
   function getProgressColor(percentage) {
     if (percentage >= 90) return '#ef4444';
     if (percentage >= 70) return '#f59e0b';
@@ -52,17 +58,28 @@
   // ============================================
   // API Functions
   // ============================================
+  // Retry transient failures only: network errors, rate limiting, and 5xx.
+  // A 401/403/404 will not fix itself on retry, so bail out immediately.
+  function isRetryableStatus(status) {
+    return status === null || status === 429 || status >= 500;
+  }
+
   async function fetchWithAuth(url, maxRetries = 2) {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      let status = null;
       try {
         const response = await fetch(url, {
           credentials: 'include',
           headers: { 'Accept': 'application/json' }
         });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (!response.ok) {
+          status = response.status;
+          throw new Error(`HTTP ${response.status}`);
+        }
         return await response.json();
       } catch (error) {
         console.error(`[Claude Track] Fetch error (attempt ${attempt + 1}/${maxRetries + 1}):`, error);
+        if (!isRetryableStatus(status)) return null;
         if (attempt < maxRetries) {
           await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
         }
@@ -100,7 +117,8 @@
         shortLabel: '7D',
         utilization: usageResponse.seven_day?.utilization ?? 0,
         resetTime: usageResponse.seven_day?.resets_at ?? null
-      }
+      },
+      lastUpdated: Date.now()
     };
 
     state.usageData = usageData;
@@ -121,7 +139,7 @@
   // UI Components
   // ============================================
   function createUsageBar(data, id) {
-    const percentage = Math.min(100, Math.max(0, data.utilization));
+    const percentage = normalizePct(data.utilization);
     const color = getProgressColor(percentage);
     const resetInfo = data.resetTime ? formatTimeRemaining(data.resetTime) : '';
 
@@ -145,8 +163,10 @@
       weeklyLimit: { label: 'Weekly Limit', shortLabel: '7D', utilization: 0, resetTime: null }
     };
 
-    const sessionColor = getProgressColor(data.sessionLimit.utilization);
-    const weeklyColor = getProgressColor(data.weeklyLimit.utilization);
+    const sessionPct = normalizePct(data.sessionLimit.utilization);
+    const weeklyPct = normalizePct(data.weeklyLimit.utilization);
+    const sessionColor = getProgressColor(sessionPct);
+    const weeklyColor = getProgressColor(weeklyPct);
 
     return `
       <!-- Collapsed View: Icon Only -->
@@ -158,8 +178,8 @@
             <path d="M6 20v-4"/>
           </svg>
           <div class="cte-mini-indicators">
-            <span class="cte-mini-dot" style="background-color: ${sessionColor};" title="5H: ${data.sessionLimit.utilization}%"></span>
-            <span class="cte-mini-dot" style="background-color: ${weeklyColor};" title="7D: ${data.weeklyLimit.utilization}%"></span>
+            <span class="cte-mini-dot" style="background-color: ${sessionColor};" title="5H: ${sessionPct}%"></span>
+            <span class="cte-mini-dot" style="background-color: ${weeklyColor};" title="7D: ${weeklyPct}%"></span>
           </div>
         </div>
       </div>
@@ -206,10 +226,12 @@
 
     const miniDots = document.querySelectorAll('.cte-mini-dot');
     if (miniDots.length >= 2) {
-      miniDots[0].style.backgroundColor = getProgressColor(data.sessionLimit.utilization);
-      miniDots[0].title = `5H: ${data.sessionLimit.utilization}%`;
-      miniDots[1].style.backgroundColor = getProgressColor(data.weeklyLimit.utilization);
-      miniDots[1].title = `7D: ${data.weeklyLimit.utilization}%`;
+      const sessionPct = normalizePct(data.sessionLimit.utilization);
+      const weeklyPct = normalizePct(data.weeklyLimit.utilization);
+      miniDots[0].style.backgroundColor = getProgressColor(sessionPct);
+      miniDots[0].title = `5H: ${sessionPct}%`;
+      miniDots[1].style.backgroundColor = getProgressColor(weeklyPct);
+      miniDots[1].title = `7D: ${weeklyPct}%`;
     }
 
   }
@@ -218,7 +240,7 @@
     const item = document.getElementById(id);
     if (!item) return;
 
-    const percentage = Math.min(100, Math.max(0, data.utilization));
+    const percentage = normalizePct(data.utilization);
     const color = getProgressColor(percentage);
     const resetInfo = data.resetTime ? formatTimeRemaining(data.resetTime) : '';
 
@@ -339,15 +361,36 @@
     if (state.refreshTimer) clearInterval(state.refreshTimer);
     state.refreshTimer = setInterval(async () => {
       if (document.hidden) return;
-      await fetchUsageData();
-      updatePanelUI();
+      await refreshUsage();
     }, CONFIG.REFRESH_INTERVAL);
+
+    // The interval skips hidden tabs, so refresh on focus rather than making
+    // the user wait out the remainder of the tick on stale numbers.
+    if (state.listeners.visibility) {
+      document.removeEventListener('visibilitychange', state.listeners.visibility);
+    }
+    const visibilityHandler = () => {
+      if (document.hidden) return;
+      if (Date.now() - (state.lastRefresh?.getTime() ?? 0) < CONFIG.MIN_REFRESH_GAP) return;
+      refreshUsage();
+    };
+    document.addEventListener('visibilitychange', visibilityHandler);
+    state.listeners.visibility = visibilityHandler;
+  }
+
+  async function refreshUsage() {
+    await fetchUsageData();
+    updatePanelUI();
   }
 
   function stopRefreshTimer() {
     if (state.refreshTimer) {
       clearInterval(state.refreshTimer);
       state.refreshTimer = null;
+    }
+    if (state.listeners.visibility) {
+      document.removeEventListener('visibilitychange', state.listeners.visibility);
+      state.listeners.visibility = null;
     }
   }
 
