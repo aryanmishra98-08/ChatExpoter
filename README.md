@@ -43,16 +43,19 @@ Track your Claude usage limits in real-time. No fuss, no complicated setup.
 
 ### Viewing Stats
 
-Navigate to [claude.ai](https://claude.ai). The **Track & Export** panel shows:
+Navigate to [claude.ai](https://claude.ai). The **Claude Meter** panel shows:
 
 - **5-Hour Session**: Current usage
 - **Weekly Limit**: Total for the week
 
+The toolbar popup shows the same two limits plus how long ago the data was
+last refreshed, since it reads a stored snapshot rather than calling the API.
+
 **Color indicators:**
 - 🟢 Green: < 50% used
 - 🟡 Yellow: 50-70% used
-- 🟠 Orange: 70-90% used
-- 🔴 Red: > 90% used
+- 🟠 Amber: 70-90% used
+- 🔴 Red: ≥ 90% used
 
 ## Privacy
 
@@ -114,8 +117,9 @@ ClaudeMeter/
 Built over a weekend, so keep in mind:
 
 - Panel placement adapts to sidebar state (may take a refresh)
-- Very long conversations need to be scrolled to load all messages
 - Usage data depends on Claude's API responses
+- The popup shows the last snapshot saved by an open Claude.ai tab, so its
+  numbers can lag until you open Claude again
 
 ## Contributing
 

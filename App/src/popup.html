@@ -114,6 +114,15 @@
       padding: 16px 0;
     }
 
+    .last-updated {
+      text-align: center;
+      font-size: 11px;
+      color: var(--text-muted);
+      padding: 2px 0 0;
+    }
+
+    .last-updated.is-stale { color: var(--warning); }
+
     /* Button */
     .btn-open {
       display: flex;
@@ -176,6 +185,8 @@
         </div>
         <div class="card-reset" id="weekly-reset"></div>
       </div>
+
+      <div class="last-updated" id="last-updated"></div>
     </div>
 
     <button class="btn-open" id="btn-open-claude">
